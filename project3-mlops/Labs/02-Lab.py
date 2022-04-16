@@ -54,8 +54,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
 
 # dictionary containing hyperparameter names and list of values we want to try
-parameters = {'n_estimators': #FILL_IN , 
-              'max_depth': #FILL_IN }
+parameters = {'n_estimators': [100,200,300] , 
+              'max_depth': [11,13,15,17] }
 
 rf = RandomForestRegressor()
 grid_rf_model = GridSearchCV(rf, parameters, cv=3)
@@ -77,21 +77,21 @@ for p in parameters:
 # TODO
 from sklearn.metrics import mean_squared_error
 
-with mlflow.start_run(run_name= FILL_IN) as run:
-  # Create predictions of X_test using best model
-  # FILL_IN
-  
-  # Log model with name
-  # FILL_IN
-  
-  # Log params
-  # FILL_IN
-  
-  # Create and log MSE metrics using predictions of X_test and its actual value y_test
-  # FILL_IN
-  
-  runID = run.info.run_uuid
-  print("Inside MLflow Run with id {}".format(runID))
+with mlflow.start_run(run_name= "RF-Grid-Search") as run:
+    # Create predictions of X_test using best model
+    pred = best_rf.predict(X_test)
+    # Log model with name
+    mlflow.sklearn.log_model(best_rf,"best_rf_model")
+    # Log params
+    params = best_rf.get_params()
+    final_params = {x:params[x] for x in params}
+    print(final_params)
+    mlflow.log_params(final_params)
+    # Create and log MSE metrics using predictions of X_test and its actual value y_test
+    error = mean_squared_error(y_true=y_test,y_pred=pred)
+    print("MSE is : ",error)
+    runID = run.info.run_uuid
+    print("Inside MLflow Run with id {}".format(runID))
 
 # COMMAND ----------
 
@@ -110,7 +110,14 @@ with mlflow.start_run(run_name= FILL_IN) as run:
 # COMMAND ----------
 
 # TODO
-model = < FILL_IN >
+from  mlflow.tracking import MlflowClient
+client = MlflowClient()
+runs = client.search_runs(run.info.experiment_id, order_by=["attributes.start_time desc"], max_results=1)
+artifactURI = 'runs:/'+runs[0].info.run_id+'/best_rf_model'
+model = mlflow.sklearn.load_model(artifactURI)
+
+for i in parameters:
+    assert best_rf.get_params()[i] == model.get_params()[i], "'{}' does not match with the best model".format(i)
 
 # COMMAND ----------
 
@@ -120,6 +127,38 @@ model = < FILL_IN >
 # COMMAND ----------
 
 # TODO
+parameters = {'n_estimators': [400,500] , 
+              'max_depth': [19,21,23] ,
+             }
+
+rf = RandomForestRegressor()
+grid_rf_model = GridSearchCV(rf, parameters, cv=5)
+grid_rf_model.fit(X_train, y_train)
+
+best_rf = grid_rf_model.best_estimator_
+
+for i in parameters:
+    print("Best '{}': {}".format(i, best_rf.get_params()[i]))
+
+with mlflow.start_run(run_name= "RF-Grid-Search-Updated") as run:
+    # Create predictions of X_test using best model
+    predictions = best_rf.predict(X_test)
+    
+    # Log model with name
+    mlflow.sklearn.log_model(best_rf, "best_rf")
+    
+    # Log params
+    all_params = best_rf.get_params()
+    best_params = {x: all_params[x] for x in parameters}
+    mlflow.log_params(best_params)
+    
+    # Create and log MSE metrics using predictions of X_test and its actual value y_test
+    error = mean_squared_error(y_test, predictions)
+    print("MSE is : ",error)
+    mlflow.log_metric("mse", error)
+    
+    runID = run.info.run_uuid
+    print("Inside MLflow Run with id {}".format(runID))
 
 # COMMAND ----------
 
@@ -128,7 +167,21 @@ model = < FILL_IN >
 
 # COMMAND ----------
 
-# TODO
+runs = client.search_runs(run.info.experiment_id, order_by=["attributes.start_time desc"], max_results=1)
+
+artifactURI = 'runs:/'+runs[0].info.run_id+'/best_rf'
+model = mlflow.sklearn.load_model(artifactURI)
+
+
+#Print the best parameters
+print("Best parameters are:")
+for i in parameters:
+    print("'{}': {}".format(i, model.get_params()[i]))
+    
+# Create predictions of X_test using best model and calculate MSE 
+predictions = model.predict(X_test)
+error = mean_squared_error(y_test, predictions)
+print(f"MSE is : {error}")
 
 # COMMAND ----------
 
@@ -160,3 +213,7 @@ model = < FILL_IN >
 # MAGIC Apache, Apache Spark, Spark and the Spark logo are trademarks of the <a href="http://www.apache.org/">Apache Software Foundation</a>.<br/>
 # MAGIC <br/>
 # MAGIC <a href="https://databricks.com/privacy-policy">Privacy Policy</a> | <a href="https://databricks.com/terms-of-use">Terms of Use</a> | <a href="http://help.databricks.com/">Support</a>
+
+# COMMAND ----------
+
+
